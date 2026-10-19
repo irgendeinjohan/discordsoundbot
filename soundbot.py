@@ -31,12 +31,20 @@ log = logging.getLogger("soundbot")
 
 
 def read_config() -> tuple[str, int, Path]:
-    token = os.environ.get("DISCORD_TOKEN", "").strip()
-    channel_id = os.environ.get("VOICE_CHANNEL_ID", "").strip()
+    # Versehentlich mitkopierte Leerzeichen, Anführungszeichen oder ein "Bot "-Präfix entfernen
+    token = os.environ.get("DISCORD_TOKEN", "").strip().strip("\"'").strip()
+    token = token.removeprefix("Bot ").strip()
+    channel_id = os.environ.get("VOICE_CHANNEL_ID", "").strip().strip("\"'").strip()
     music_dir = Path(os.environ.get("MUSIC_DIR", "/music"))
 
     if not token or token == "HIER_DEINEN_BOT_TOKEN_EINTRAGEN":
         sys.exit("FEHLER: DISCORD_TOKEN ist nicht gesetzt. Bitte in der docker-compose.yml eintragen.")
+    if token.count(".") != 2:
+        log.warning(
+            "DISCORD_TOKEN sieht nicht wie ein Bot-Token aus (erwartet: drei Teile mit Punkten, ~70 Zeichen; "
+            "aktuell %d Zeichen). Application ID, Public Key oder Client Secret sind NICHT der Token.",
+            len(token),
+        )
     if not channel_id.isdigit():
         sys.exit(f"FEHLER: VOICE_CHANNEL_ID muss eine Zahl sein (aktuell: {channel_id!r}).")
     return token, int(channel_id), music_dir
@@ -253,7 +261,14 @@ def main() -> None:
         log.warning("Musikordner %s existiert nicht – ist das Volume richtig eingebunden?", music_dir)
 
     bot = SoundBot(channel_id, music_dir)
-    bot.run(token, log_handler=None)
+    try:
+        bot.run(token, log_handler=None)
+    except discord.LoginFailure:
+        log.error(
+            "Discord hat den Token abgelehnt. Im Developer Portal unter 'Bot' auf 'Reset Token' klicken, "
+            "den neuen Token in DISCORD_TOKEN eintragen und das Projekt neu erstellen."
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":
