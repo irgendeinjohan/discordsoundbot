@@ -1,0 +1,14 @@
+services:
+  discordsoundbot:
+    image: ghcr.io/irgendeinjohan/discordsoundbot:latest
+    container_name: discordsoundbot
+    restart: unless-stopped
+    environment:
+      # Bot-Token aus dem Discord Developer Portal (Bot → Reset Token)
+      DISCORD_TOKEN: "HIER_DEINEN_BOT_TOKEN_EINTRAGEN"
+      # ID des Sprachkanals (Rechtsklick auf den Kanal → "Kanal-ID kopieren")
+      VOICE_CHANNEL_ID: "123456789012345678"
+      TZ: "Europe/Berlin"
+    volumes:
+      # Musikordner auf der NAS → einfach MP3s & Co. hineinlegen
+      - /volume1/docker/discordsoundbot/music:/music:ro

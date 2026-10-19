@@ -1,0 +1,2 @@
+discord.py[voice]==2.7.1
+mutagen==1.48.1
