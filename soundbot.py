@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import discord
+from discord import app_commands
 from mutagen import File as MutagenFile
 
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".wav", ".ogg", ".oga", ".opus", ".m4a", ".aac", ".wma"}
@@ -91,6 +92,12 @@ class SoundBot(discord.Client):
         self.session = 0
         self.failed_in_row = 0
         self.waiting_for_music = False
+        self.current_title: str | None = None
+        self.skip_requested = False
+        self.commands_synced = False
+
+        self.tree = app_commands.CommandTree(self)
+        self.tree.command(name="skip", description="Überspringt den aktuellen Titel")(self.cmd_skip)
 
     async def setup_hook(self) -> None:
         self.loop.create_task(self.watchdog())
@@ -107,7 +114,23 @@ class SoundBot(discord.Client):
             )
         else:
             log.info("Überwache Sprachkanal '%s' auf Server '%s'", channel.name, channel.guild.name)
+            await self.sync_commands(channel.guild)
         await self.sync_state()
+
+    async def sync_commands(self, guild: discord.Guild) -> None:
+        """Registriert die Slash-Befehle direkt auf dem Server (wirkt sofort, global dauert es bis zu 1 h)."""
+        if self.commands_synced:
+            return
+        try:
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
+            self.commands_synced = True
+            log.info("Slash-Befehle registriert: /skip")
+        except discord.HTTPException as e:
+            log.error(
+                "Slash-Befehle konnten nicht registriert werden (Bot mit Scope 'applications.commands' "
+                "neu einladen): %s", e,
+            )
 
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState,
                                     after: discord.VoiceState) -> None:
@@ -123,6 +146,28 @@ class SoundBot(discord.Client):
                 await self.sync_state()
             except Exception:
                 log.exception("Fehler bei der Zustandsprüfung")
+
+    # ---------- Befehle ----------
+
+    async def cmd_skip(self, interaction: discord.Interaction) -> None:
+        channel = self.get_channel(self.channel_id)
+        if not isinstance(channel, discord.VoiceChannel) or interaction.guild_id != channel.guild.id:
+            await interaction.response.send_message("Dieser Befehl funktioniert hier nicht.", ephemeral=True)
+            return
+        if interaction.user.id not in {m.id for m in channel.members}:
+            await interaction.response.send_message(
+                f"Du musst im Kanal {channel.mention} sein, um Titel zu überspringen.", ephemeral=True
+            )
+            return
+        vc = channel.guild.voice_client
+        if vc is None or not vc.is_playing():
+            await interaction.response.send_message("Gerade läuft nichts.", ephemeral=True)
+            return
+
+        log.info("%s überspringt: %s", interaction.user, self.current_title)
+        await interaction.response.send_message(f"⏭️ **{self.current_title}** übersprungen")
+        self.skip_requested = True
+        vc.stop()  # löst den after-Callback aus → nächster Titel startet
 
     # ---------- Kanal betreten / verlassen ----------
 
@@ -167,6 +212,7 @@ class SoundBot(discord.Client):
         self.session += 1
         self.playlist = []  # bei jedem Betreten neu mischen
         self.failed_in_row = 0
+        self.skip_requested = False
         self.waiting_for_music = False
         self.play_next(vc, self.session)
 
@@ -174,6 +220,7 @@ class SoundBot(discord.Client):
         self.session += 1
         self.playlist = []
         self.waiting_for_music = False
+        self.current_title = None
         vc.stop()
         try:
             await vc.disconnect(force=True)
@@ -224,6 +271,7 @@ class SoundBot(discord.Client):
             self.loop.call_soon_threadsafe(self.track_finished, vc, session, failed)
 
         title = track_title(track)
+        self.current_title = title
         log.info("Spiele: %s", title)
         vc.play(source, after=after)
         self.loop.create_task(self.set_now_playing(title))
@@ -231,6 +279,9 @@ class SoundBot(discord.Client):
     def track_finished(self, vc: discord.VoiceClient, session: int, failed: bool) -> None:
         if session != self.session:
             return
+        if self.skip_requested:  # übersprungene Titel zählen nicht als defekt
+            self.skip_requested = False
+            failed = False
         self.failed_in_row = self.failed_in_row + 1 if failed else 0
         self.play_next(vc, session)
 

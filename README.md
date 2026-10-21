@@ -9,6 +9,14 @@ Ein kleiner Discord-Bot, der automatisch Musik in einem Sprachkanal abspielt:
 - Als Status zeigt der Bot **„Hört …“** mit dem aktuellen Titel. Er nimmt „Interpret - Titel“ aus den Tags, sonst den Dateinamen.
 - Verlässt der letzte Nutzer den Kanal, trennt sich der Bot sofort.
 
+### Befehle
+
+| Befehl  | Wirkung |
+|---------|---------|
+| `/skip` | Überspringt den aktuellen Titel. Funktioniert nur, wenn du selbst im Musik-Kanal bist. |
+
+Die Befehle erscheinen nach dem Start des Bots sofort auf deinem Server, wenn du im Chat `/` tippst.
+
 Unterstützte Formate: `mp3`, `flac`, `wav`, `ogg`, `oga`, `opus`, `m4a`, `aac`, `wma`.
 Es werden nur Dateien direkt im Ordner gelesen, keine Unterordner. Die Lautstärke bleibt original (100 %).
 
@@ -21,7 +29,7 @@ Es werden nur Dateien direkt im Ordner gelesen, keine Unterordner. Die Lautstär
    > Der Token ist wie ein Passwort. Gib ihn niemandem weiter und lade ihn nicht auf GitHub hoch.
 3. Die Schalter unter *Privileged Gateway Intents* brauchst du **nicht**.
 4. Links auf **OAuth2** gehen und unten den **URL Generator** öffnen:
-   - Bei *Scopes* **`bot`** anhaken.
+   - Bei *Scopes* **`bot`** und **`applications.commands`** anhaken (für `/skip`).
    - Bei *Bot Permissions* **View Channels**, **Connect** und **Speak** anhaken.
    - Die erzeugte URL im Browser öffnen und den Bot auf deinen Server einladen.
 
@@ -87,6 +95,7 @@ Container Manager → **Projekt** → `discordsoundbot` → **Aktion → Stoppen
 | `Verbinden fehlgeschlagen`                            | Dem Bot fehlen im Kanal die Rechte **Verbinden** oder **Sprechen**. |
 | `Keine Musikdateien in /music gefunden`               | Liegen die Dateien direkt in `/volume1/docker/discordsoundbot/music`? Stimmt der Pfad im `volumes:`-Eintrag? |
 | `Musikordner … kann nicht gelesen werden`             | Ordnerrechte in der File Station prüfen. |
+| `Slash-Befehle konnten nicht registriert werden`      | Bot über den URL Generator mit den Scopes `bot` **und** `applications.commands` erneut einladen (er muss vorher nicht entfernt werden). |
 
 ## Lokal ohne Docker starten
 
